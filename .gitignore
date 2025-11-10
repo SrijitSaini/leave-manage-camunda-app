@@ -1,0 +1,20 @@
+# Maven
+target/
+
+# Compiled class files
+*.class
+bin/
+
+# IDE specific
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+
+# Logs
+*.log
+
+# OS-specific
+.DS_Store
+Thumbs.db
