@@ -4,6 +4,8 @@ import com.example.workflow.service.LeaveService;
 import org.camunda.bpm.engine.RuntimeService;
 import org.camunda.bpm.engine.TaskService;
 import org.camunda.bpm.engine.task.Task;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +18,7 @@ public class LeaveController {
     private final RuntimeService runtimeService;
     private final TaskService taskService;
     private final LeaveService leaveService;
+    private static final Logger logger = LoggerFactory.getLogger(LeaveController.class);
 
     public LeaveController(RuntimeService runtimeService, TaskService taskService, LeaveService leaveService) {
         this.runtimeService = runtimeService;
@@ -27,6 +30,8 @@ public class LeaveController {
     public ResponseEntity<Map<String, Object>> startLeave(@RequestBody StartLeaveRequest req) {
         Map<String, Object> vars = new HashMap<>();
         vars.put("leaveDays", req.getLeaveDays());
+
+        logger.info("Leave request for {} days received", req.getLeaveDays());
 
         var processInstance = runtimeService.startProcessInstanceByKey("leave_approval_process", vars);
 
@@ -50,15 +55,39 @@ public class LeaveController {
 
     @PostMapping("/tasks/{taskId}/complete")
     public ResponseEntity<String> completeTask(@PathVariable("taskId") String taskId, @RequestBody CompleteTaskRequest req) {
-        Map<String, Object> vars = Map.of("approved", req.isApproved());
+        boolean approved = req.isApproved();
+
+        logger.info("Manager's decision: {}", approved);
+
+        // Get the task
+        Task task = taskService.createTaskQuery().taskId(taskId).singleResult();
+        if (task == null) {
+            return ResponseEntity.badRequest().body("Task not found");
+        }
+
+        String processInstanceId = task.getProcessInstanceId();
+
+        // Fetch leave days
+        Integer days = (Integer) runtimeService.getVariable(processInstanceId, "leaveDays");
+
+        // ✔ If manager APPROVES → deduct leaves here (correct place)
+        if (approved) {
+            leaveService.deductLeaves(days);
+        }
+
+        Map<String, Object> vars = Map.of("approved", approved);
         taskService.complete(taskId, vars);
-        return ResponseEntity.ok("Task completed");
+        return ResponseEntity.ok(
+                approved ? "Leave approved and leaves deducted" : "Leave rejected"
+        );
     }
 
     @GetMapping("/balance")
     public ResponseEntity<Map<String, Object>> getBalance() {
+        int balance = leaveService.getBalance();
+        logger.info("current balance is: {}", balance);
         return ResponseEntity.ok(Map.of(
-                "balance", leaveService.getBalance()
+                "balance", balance
         ));
     }
 

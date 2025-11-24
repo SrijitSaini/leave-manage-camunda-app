@@ -20,15 +20,14 @@ public class CheckLeaveBalanceDelegate implements JavaDelegate {
 
         boolean enoughLeaves = leaveService.hasEnoughLeaves(days);
 
+        execution.setVariable("enoughLeaves", enoughLeaves);
+
         if (enoughLeaves) {
             // Deduct leaves and continue to Manager Approval
-            leaveService.deductLeaves(days);
             execution.setVariable("approved", null); // decision pending
         } else {
             // Reject immediately
             execution.setVariable("approved", false);
         }
-
-        execution.setVariable("enoughLeaves", enoughLeaves);
     }
 }
